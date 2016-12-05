@@ -1,4 +1,4 @@
-package usb
+package gotmclibusb
 
 import (
 	"fmt"
@@ -33,10 +33,14 @@ func GetCottonwoodDevices() (cottonwoodDevices []*libusb.Device, err error) {
 		if errDev == nil && product == "AS3991" && manufacturer == "AMS" {
 			cottonwoodDevices = append(cottonwoodDevices, device)
 		}
+
+		err = errDev
 	}
 
 	if len(cottonwoodDevices) == 0 {
-		return cottonwoodDevices, fmt.Errorf("Couldn't find any Cottonwood device. %v", err)
+		return cottonwoodDevices, fmt.Errorf(
+			"Couldn't find any Cottonwood device.\n %v.\n"+
+				"Maybe you can try chown on /dev/bus/usb/<bus>/<device>", err)
 	}
 
 	return cottonwoodDevices, nil
