@@ -34,41 +34,41 @@ func main() {
 			}
 		}()
 
-		configDescriptor, err := cottonwoodDevice.GetActiveConfigDescriptor()
-		if err != nil {
-			log.Fatalf("Failed getting the active config: %v", err)
-		}
-		fmt.Printf("=> Max Power = %d mA\n",
-			configDescriptor.MaxPowerMilliAmperes)
-		var singularPlural string
-		if configDescriptor.NumInterfaces == 1 {
-			singularPlural = "interface"
-		} else {
-			singularPlural = "interfaces"
-		}
-		fmt.Printf("=> Found %d %s\n",
-			configDescriptor.NumInterfaces, singularPlural)
-		fmt.Printf("=> The first interface has %d alternate settings.\n",
-			configDescriptor.SupportedInterfaces[0].NumAltSettings)
-		firstDescriptor := configDescriptor.SupportedInterfaces[0].InterfaceDescriptors[0]
-		fmt.Printf("=> The first interface descriptor has a length of %d.\n", firstDescriptor.Length)
-		fmt.Printf("=> The first interface descriptor is interface number %d.\n", firstDescriptor.InterfaceNumber)
-		fmt.Printf("=> The first interface descriptor has %d endpoint(s).\n", firstDescriptor.NumEndpoints)
-		fmt.Printf(
-			"   => USB-IF class %d, subclass %d, protocol %d.\n",
-			firstDescriptor.InterfaceClass, firstDescriptor.InterfaceSubClass, firstDescriptor.InterfaceProtocol,
-		)
-		for i, endpoint := range firstDescriptor.EndpointDescriptors {
-			fmt.Printf(
-				"   => Endpoint index %d on Interface %d has the following properties:\n",
-				i, firstDescriptor.InterfaceNumber)
-			fmt.Printf("     => Address: %d (b%08b)\n", endpoint.EndpointAddress, endpoint.EndpointAddress)
-			fmt.Printf("       => Endpoint #: %d\n", endpoint.Number())
-			fmt.Printf("       => Direction: %s (%d)\n", endpoint.Direction(), endpoint.Direction())
-			fmt.Printf("     => Attributes: %d (b%08b) \n", endpoint.Attributes, endpoint.Attributes)
-			fmt.Printf("       => Transfer Type: %s (%d) \n", endpoint.TransferType(), endpoint.TransferType())
-			fmt.Printf("     => Max packet size: %d\n", endpoint.MaxPacketSize)
-		}
+		// configDescriptor, err := cottonwoodDevice.GetActiveConfigDescriptor()
+		// if err != nil {
+		// 	log.Fatalf("Failed getting the active config: %v", err)
+		// }
+		// fmt.Printf("=> Max Power = %d mA\n",
+		// 	configDescriptor.MaxPowerMilliAmperes)
+		// var singularPlural string
+		// if configDescriptor.NumInterfaces == 1 {
+		// 	singularPlural = "interface"
+		// } else {
+		// 	singularPlural = "interfaces"
+		// }
+		// fmt.Printf("=> Found %d %s\n",
+		// 	configDescriptor.NumInterfaces, singularPlural)
+		// fmt.Printf("=> The first interface has %d alternate settings.\n",
+		// 	configDescriptor.SupportedInterfaces[0].NumAltSettings)
+		// firstDescriptor := configDescriptor.SupportedInterfaces[0].InterfaceDescriptors[0]
+		// fmt.Printf("=> The first interface descriptor has a length of %d.\n", firstDescriptor.Length)
+		// fmt.Printf("=> The first interface descriptor is interface number %d.\n", firstDescriptor.InterfaceNumber)
+		// fmt.Printf("=> The first interface descriptor has %d endpoint(s).\n", firstDescriptor.NumEndpoints)
+		// fmt.Printf(
+		// 	"   => USB-IF class %d, subclass %d, protocol %d.\n",
+		// 	firstDescriptor.InterfaceClass, firstDescriptor.InterfaceSubClass, firstDescriptor.InterfaceProtocol,
+		// )
+		// for i, endpoint := range firstDescriptor.EndpointDescriptors {
+		// 	fmt.Printf(
+		// 		"   => Endpoint index %d on Interface %d has the following properties:\n",
+		// 		i, firstDescriptor.InterfaceNumber)
+		// 	fmt.Printf("     => Address: %d (b%08b)\n", endpoint.EndpointAddress, endpoint.EndpointAddress)
+		// 	fmt.Printf("       => Endpoint #: %d\n", endpoint.Number())
+		// 	fmt.Printf("       => Direction: %s (%d)\n", endpoint.Direction(), endpoint.Direction())
+		// 	fmt.Printf("     => Attributes: %d (b%08b) \n", endpoint.Attributes, endpoint.Attributes)
+		// 	fmt.Printf("       => Transfer Type: %s (%d) \n", endpoint.TransferType(), endpoint.TransferType())
+		// 	fmt.Printf("     => Max packet size: %d\n", endpoint.MaxPacketSize)
+		// }
 
 		err = handle.ClaimInterface(0)
 		if err != nil {

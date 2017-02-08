@@ -16,11 +16,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"strconv"
+	"time"
 
-	"github.com/jpoirier/gousb/usb"
+	"github.com/thorduri/go-libusb/usb"
 )
 
 func main() {
@@ -64,50 +64,48 @@ func main() {
 		// and can be interacted with.
 		// Open up two ep for read and write
 
-		epBulkRead, err := dev.OpenEndpoint(1, 0, 0, 1|uint8(usb.ENDPOINT_DIR_IN))
-		if err != nil {
-			log.Fatalf("OpenEndpoint Read error for %v: %v", dev.Address, err)
-		}
-
 		epBulkWrite, err := dev.OpenEndpoint(1, 0, 0, 2|uint8(usb.ENDPOINT_DIR_OUT))
 		if err != nil {
 			log.Fatalf("OpenEndpoint Write error for %v: %v", dev.Address, err)
 		}
 
 		// Poll Firmware/Hardware Version ID
-		h := make([]byte, 64)
 
-		h[0] = 0x10
-		h[1] = 0x03
-		h[2] = 0x00
+		// AntennaOn
+		outAntennaPowerOnCmd := []byte{0x18, 0x03, 0xFF}
+		// outFirmIdCmd := []byte{0x10, 0x03, 0x00}
+		// outHardIdCmd := []byte{0x10, 0x03, 0x01}
 
-		// h[0] = 0x10
-		// h[1] = 0x40
-		log.Println("Poll Firmware/Hardware Version ID ")
-		i, err := epBulkWrite.Write(h)
+		i, err := epBulkWrite.Write(outAntennaPowerOnCmd)
 		if err != nil {
-			log.Fatalf("Cannot poll Firmware/Hardware Version ID: %v\n", err)
+			log.Fatalf("Cannot write command: %v\n", err)
 		}
 		log.Printf("%v bytes sent", i)
 
-		for {
-			c := make([]byte, 64)
-			n, errR := epBulkRead.Read(c)
-			if errR != nil {
-				fmt.Errorf("Cannot read Firmware/Hardware Version ID: %v\n", errR)
-			}
-			log.Printf("%v bytes read\n", n)
-			fmt.Printf("%v bytes read\n", c)
+		time.Sleep(1 * time.Second)
+
+		epBulkRead, err := dev.OpenEndpoint(1, 0, 0, 1|uint8(usb.ENDPOINT_DIR_IN))
+		if err != nil {
+			log.Fatalf("OpenEndpoint Read error for %v: %v", dev.Address, err)
 		}
 
-		// var b [8]byte
-		// for {
-		// 	n, errRead := epBulkRead.Read(b[:])
-		// 	log.Printf("read %d bytes: % x [err: %v]", n, b[:n], errRead)
-		// 	if errRead != nil {
-		// 		break
-		// 	}
+		// readBuffer := make([]byte, 64)
+		// n, errR := epBulkRead.Read(readBuffer)
+		// if errR != nil {
+		// 	fmt.Errorf("Cannot read: %v\n", errR)
 		// }
+		// log.Printf("%v bytes read\n", n)
+		// fmt.Printf("%v bytes read\n", readBuffer)
+
+		for {
+			readBuffer := make([]byte, 64)
+			n, errRead := epBulkRead.Read(readBuffer)
+			log.Printf("read %d bytes: %v", n, readBuffer)
+			if errRead != nil {
+				log.Printf("error reading: %v\n", errRead)
+			}
+			time.Sleep(1 * time.Second)
+		}
 
 	}
 }
