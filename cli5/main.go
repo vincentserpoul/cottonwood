@@ -26,7 +26,7 @@ func main() {
 		}()
 		fmt.Println("opened", d.Path)
 
-		res, err := dev.OutAntennaPower([]byte{0xff})
+		res, err := dev.OutFirmHardID([]byte{0x00})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -64,7 +64,7 @@ func Devices() ([]*hid.DeviceInfo, error) {
 	return res, nil
 }
 
-// Open initializes a communication channel with a U2F HID device.
+// Open initializes a communication channel with a HID device.
 func Open(info *hid.DeviceInfo) (*Device, error) {
 	hidDev, err := info.Open()
 	if err != nil {
