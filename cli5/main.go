@@ -5,12 +5,11 @@ import (
 	"log"
 	"sync"
 	"time"
-
-	"github.com/flynn/hid"
+	"unsafe"
 )
 
 func main() {
-	devices, err := Devices()
+	devices, err := getDevices()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,11 +25,34 @@ func main() {
 		}()
 		fmt.Println("opened", d.Path)
 
-		res, err := dev.OutFirmHardID([]byte{0x00})
+		/* Set Feature */
+		bufS := make([]byte, 64)
+		bufS[0] = 0x10
+		bufS[1] = 0x03
+		bufS[2] = 0x00
+		fd := dev.device.f.Fd()
+		err = Ioctl(fd, IoctlHIDIOCSFEATURE(64), uintptr(unsafe.Pointer(&bufS[0])))
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			log.Print("all good, report sent")
+		}
+
+		time.Sleep(100 * time.Millisecond)
+		/* Get Feature */
+		bufG := make([]byte, 64)
+		bufG[0] = 0x10 /* Report Number */
+		err = Ioctl(fd, IoctlHIDIOCGFEATURE(64), uintptr(unsafe.Pointer(&bufG[0])))
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("message %v", res)
+
+		for _, charact := range bufG {
+			if charact != 0 {
+				fmt.Printf("%X ", charact)
+			}
+		}
+
 	}
 }
 
@@ -48,13 +70,13 @@ const (
 // }
 
 // Devices lists available HID devices that advertise the U2F HID protocol.
-func Devices() ([]*hid.DeviceInfo, error) {
-	devices, err := hid.Devices()
+func getDevices() ([]*DeviceInfo, error) {
+	devices, err := Devices()
 	if err != nil {
 		return nil, err
 	}
 
-	res := make([]*hid.DeviceInfo, 0, len(devices))
+	res := make([]*DeviceInfo, 0, len(devices))
 	for _, d := range devices {
 		if d.VendorID == cottonVendorID && d.ProductID == cottonProductID {
 			res = append(res, d)
@@ -65,7 +87,7 @@ func Devices() ([]*hid.DeviceInfo, error) {
 }
 
 // Open initializes a communication channel with a HID device.
-func Open(info *hid.DeviceInfo) (*Device, error) {
+func Open(info *DeviceInfo) (*Device, error) {
 	hidDev, err := info.Open()
 	if err != nil {
 		return nil, err
@@ -87,8 +109,8 @@ type Device struct {
 	MinorDeviceVersion uint8
 	BuildDeviceVersion uint8
 
-	info   *hid.DeviceInfo
-	device hid.Device
+	info   *DeviceInfo
+	device *linuxDevice
 
 	mtx    sync.Mutex
 	readCh <-chan []byte
