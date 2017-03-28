@@ -1,4 +1,4 @@
-package main
+package hid
 
 // from https://github.com/flynn/hid/blob/master/hid.go
 
@@ -8,10 +8,12 @@ import "C"
 import (
 	"bytes"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
-	"sync"
 	"unsafe"
+
+	"github.com/vincentserpoul/cottonwood/ioctl"
 )
 
 // DeviceInfo provides general information about a device.
@@ -33,43 +35,36 @@ type DeviceInfo struct {
 }
 
 var (
-	ioctlHIDIOCGRDESCSIZE = IoR('H', 0x01, C.sizeof_int)
-	ioctlHIDIOCGRDESC     = IoR('H', 0x02, C.sizeof_struct_hidraw_report_descriptor)
-	ioctlHIDIOCGRAWINFO   = IoR('H', 0x03, C.sizeof_struct_hidraw_devinfo)
+	ioctlHIDIOCGRDESCSIZE = ioctl.IoR('H', 0x01, C.sizeof_int)
+	ioctlHIDIOCGRDESC     = ioctl.IoR('H', 0x02, C.sizeof_struct_hidraw_report_descriptor)
+	ioctlHIDIOCGRAWINFO   = ioctl.IoR('H', 0x03, C.sizeof_struct_hidraw_devinfo)
 )
 
 func ioctlHIDIOCGRAWNAME(size int) uintptr {
-	return IoR('H', 0x04, uintptr(size))
+	return ioctl.IoR('H', 0x04, uintptr(size))
 }
 
-func ioctlHIDIOCGRAWPHYS(size int) uintptr {
-	return IoR('H', 0x05, uintptr(size))
-}
-
+// IoctlHIDIOCSFEATURE HID set feature
 func IoctlHIDIOCSFEATURE(size int) uintptr {
-	return IoRW('H', 0x06, uintptr(size))
+	return ioctl.IoRW('H', 0x06, uintptr(size))
 }
 
+// IoctlHIDIOCGFEATURE HID get feature
 func IoctlHIDIOCGFEATURE(size int) uintptr {
-	return IoRW('H', 0x07, uintptr(size))
+	return ioctl.IoRW('H', 0x07, uintptr(size))
 }
 
-type linuxDevice struct {
-	f    *os.File
-	info *DeviceInfo
-
-	readSetup sync.Once
-	readErr   error
-	readCh    chan []byte
-}
-
+// Devices lists all available hid devices
 func Devices() ([]*DeviceInfo, error) {
 	sys, err := os.Open("/sys/class/hidraw")
 	if err != nil {
 		return nil, err
 	}
 	names, err := sys.Readdirnames(0)
-	sys.Close()
+	errClose := sys.Close()
+	if err != nil {
+		return nil, errClose
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -98,31 +93,37 @@ func getDeviceInfo(path string) (*DeviceInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer dev.Close()
-	fd := uintptr(dev.Fd())
+	defer func() {
+		err := dev.Close()
+		if err != nil {
+			log.Printf("getDeviceInfo(%s): %v", path, err)
+		}
+	}()
+
+	fd := dev.Fd()
 
 	var descSize C.int
-	if err := Ioctl(fd, ioctlHIDIOCGRDESCSIZE, uintptr(unsafe.Pointer(&descSize))); err != nil {
+	if err := ioctl.Ioctl(fd, ioctlHIDIOCGRDESCSIZE, uintptr(unsafe.Pointer(&descSize))); err != nil {
 		return nil, err
 	}
 
 	rawDescriptor := C.struct_hidraw_report_descriptor{
 		size: C.__u32(descSize),
 	}
-	if err := Ioctl(fd, ioctlHIDIOCGRDESC, uintptr(unsafe.Pointer(&rawDescriptor))); err != nil {
+	if err := ioctl.Ioctl(fd, ioctlHIDIOCGRDESC, uintptr(unsafe.Pointer(&rawDescriptor))); err != nil {
 		return nil, err
 	}
 	d.parseReport(C.GoBytes(unsafe.Pointer(&rawDescriptor.value), descSize))
 
 	var rawInfo C.struct_hidraw_devinfo
-	if err := Ioctl(fd, ioctlHIDIOCGRAWINFO, uintptr(unsafe.Pointer(&rawInfo))); err != nil {
+	if err := ioctl.Ioctl(fd, ioctlHIDIOCGRAWINFO, uintptr(unsafe.Pointer(&rawInfo))); err != nil {
 		return nil, err
 	}
 	d.VendorID = uint16(rawInfo.vendor)
 	d.ProductID = uint16(rawInfo.product)
 
 	rawName := make([]byte, 256)
-	if err := Ioctl(fd, ioctlHIDIOCGRAWNAME(len(rawName)), uintptr(unsafe.Pointer(&rawName[0]))); err != nil {
+	if err := ioctl.Ioctl(fd, ioctlHIDIOCGRAWNAME(len(rawName)), uintptr(unsafe.Pointer(&rawName[0]))); err != nil {
 		return nil, err
 	}
 	d.Product = string(rawName[:bytes.IndexByte(rawName, 0)])
@@ -183,52 +184,7 @@ func (d *DeviceInfo) parseReport(b []byte) {
 	}
 }
 
-func ByPath(path string) (*DeviceInfo, error) {
-	return getDeviceInfo(path)
-}
-
-func (d *DeviceInfo) Open() (*linuxDevice, error) {
-	f, err := os.OpenFile(d.Path, os.O_RDWR, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return &linuxDevice{f: f, info: d}, nil
-}
-
-func (d *linuxDevice) Close() {
-	d.f.Close()
-}
-
-func (d *linuxDevice) Write(data []byte) error {
-	_, err := d.f.Write(data)
-	return err
-}
-
-func (d *linuxDevice) ReadCh() <-chan []byte {
-	d.readSetup.Do(func() {
-		d.readCh = make(chan []byte, 30)
-		go d.readThread()
-	})
-	return d.readCh
-}
-
-func (d *linuxDevice) ReadError() error {
-	return d.readErr
-}
-
-func (d *linuxDevice) readThread() {
-	defer close(d.readCh)
-	for {
-		buf := make([]byte, d.info.InputReportLength)
-		n, err := d.f.Read(buf)
-		if err != nil {
-			d.readErr = err
-			return
-		}
-		select {
-		case d.readCh <- buf[:n]:
-		default:
-		}
-	}
+// Open device and returns linux device
+func (d *DeviceInfo) Open() (*os.File, error) {
+	return os.OpenFile(d.Path, os.O_RDWR, 0)
 }

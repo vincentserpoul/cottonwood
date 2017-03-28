@@ -1,4 +1,4 @@
-package main
+package ioctl
 
 // From https://github.com/wolfeidau/gioctl
 
