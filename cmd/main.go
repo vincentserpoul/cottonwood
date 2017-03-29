@@ -68,14 +68,12 @@ func main() {
 			if errInv != nil {
 				log.Println(errInv)
 			}
-			fmt.Printf("%d tags found: ", len(tags))
+			fmt.Printf("%d tag(s) found: ", len(tags))
 
-			if len(tags) > 0 {
-				for _, charact := range tags[0].ID {
-					fmt.Printf("0x%X ", charact)
-				}
+			for _, tag := range tags {
+				fmt.Printf("%X\n", tag.ID)
 			}
-			fmt.Println()
+
 			time.Sleep(2 * time.Second)
 
 		}

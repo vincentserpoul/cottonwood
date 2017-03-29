@@ -155,7 +155,8 @@ func (dev *Device) outInventory(data []byte) ([]byte, error) {
 
 // Tag represents a tag
 type Tag struct {
-	ID []byte
+	ID  []byte
+	RFU []byte
 }
 
 // OutInventory get the inventory
@@ -169,8 +170,6 @@ func (dev *Device) OutInventory() ([]Tag, error) {
 		return nil, fmt.Errorf("OutInventory(0x%X): %c", response[0], response[1])
 	}
 
-	frameLen := int(response[1])
-
 	tagCount := int(response[2])
 	if tagCount == 0 {
 		return nil, nil
@@ -178,8 +177,12 @@ func (dev *Device) OutInventory() ([]Tag, error) {
 
 	tags := make([]Tag, tagCount)
 
-	tags[0] = Tag{ID: response[6:frameLen]}
-
+	frameLen := int(response[1])
+	tagLen := int(response[3])
+	tags[0] = Tag{
+		ID:  response[6 : 6+tagLen],
+		RFU: response[6+tagLen : frameLen],
+	}
 	return tags, nil
 
 	// response, err := dev.outInventory([]byte{0x02})
