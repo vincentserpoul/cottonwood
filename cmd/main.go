@@ -56,13 +56,6 @@ func main() {
 			log.Fatal(err)
 		}
 
-		for i, charact := range resp {
-			if i > 1 && charact != 0 {
-				fmt.Printf("%c", charact)
-			}
-		}
-		fmt.Print("\n")
-
 		for {
 			tags, errInv := dev.OutInventory()
 			if errInv != nil {
@@ -74,7 +67,7 @@ func main() {
 				fmt.Printf("%X\n", tag.ID)
 			}
 
-			time.Sleep(2 * time.Second)
+			time.Sleep(3 * time.Second)
 
 		}
 

@@ -71,7 +71,7 @@ func (dev *Device) Command(reportID byte, payload []byte) ([]byte, error) {
 	}
 
 	// wait a little
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	bufG := make([]byte, 64)
 	bufG[0] = reportID
@@ -84,7 +84,7 @@ func (dev *Device) Command(reportID byte, payload []byte) ([]byte, error) {
 }
 
 // command will run a report on the device
-func (dev *Device) command(reportID byte, payload []byte) ([]byte, error) {
+func (dev *Device) command(reportID byte, payload []byte, waitingTime time.Duration) ([]byte, error) {
 
 	/* Set Feature */
 	bufS := make([]byte, messageLen)
@@ -101,7 +101,7 @@ func (dev *Device) command(reportID byte, payload []byte) ([]byte, error) {
 	}
 
 	// wait a little
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(waitingTime)
 
 	bufG := make([]byte, 64)
 	bufG[0] = reportID
@@ -125,7 +125,7 @@ const (
 // 0x00 Firmware
 // 0x01 Hardware
 func (dev *Device) OutFirmHardID(data []byte) ([]byte, error) {
-	return dev.command(cmdOutFirmHardID, data)
+	return dev.command(cmdOutFirmHardID, data, 100*time.Millisecond)
 }
 
 // OutAntennaPower changes the antenna power.
@@ -134,7 +134,7 @@ func (dev *Device) OutFirmHardID(data []byte) ([]byte, error) {
 // 0x01 - 0xFE Reserved to change the output level in later versions.
 // 0xFF Power ON
 func (dev *Device) OutAntennaPower(data []byte) ([]byte, error) {
-	return dev.command(cmdOutAntennaPower, data)
+	return dev.command(cmdOutAntennaPower, data, 100*time.Millisecond)
 }
 
 // outInventory ask for inventory
@@ -150,7 +150,23 @@ func (dev *Device) OutAntennaPower(data []byte) ([]byte, error) {
 // Byte 4-Byte xx:  EPC 1…x
 // Bytexx+1..Byte: EPC 1…x rfu
 func (dev *Device) outInventory(data []byte) ([]byte, error) {
-	return dev.command(cmdOutInventory, data)
+	return dev.command(cmdOutInventory, data, 100*time.Millisecond)
+}
+
+// outInventory ask for inventory
+// data possible values
+// 0x01 Start inventory round
+// 0x02 Next Tag information (should not be sent anymore since v1.3.0)
+//
+// RESPONSE
+// Byte 0: report ID
+// Byte 1: Frame length
+// Byte 2: Number of found tags
+// Byte 3: Length of EPC byte
+// Byte 4-Byte xx:  EPC 1…x
+// Bytexx+1..Byte: EPC 1…x rfu
+func (dev *Device) outInventoryRSSI(data []byte) ([]byte, error) {
+	return dev.command(cmdOutInventory, data, 100*time.Millisecond)
 }
 
 // Tag represents a tag
@@ -167,7 +183,7 @@ func (dev *Device) OutInventory() ([]Tag, error) {
 	}
 
 	if response[0] != 0x32 {
-		return nil, fmt.Errorf("OutInventory(0x%X): %c", response[0], response[1])
+		return nil, fmt.Errorf("OutInventory: %X", response)
 	}
 
 	tagCount := int(response[2])
@@ -183,7 +199,7 @@ func (dev *Device) OutInventory() ([]Tag, error) {
 		ID:  response[6 : 6+tagLen],
 		RFU: response[6+tagLen : frameLen],
 	}
+
 	return tags, nil
 
-	// response, err := dev.outInventory([]byte{0x02})
 }
